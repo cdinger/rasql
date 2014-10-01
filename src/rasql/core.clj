@@ -30,18 +30,16 @@
 (defn select [relation predicate]
   (Relation. (base relation) (alt relation) predicate (proj relation)))
 
-(defn to-sql [relation]
-  (if (isa? (type relation) String)
-    relation
-    (let [raw-cols (proj relation)
-          cols     (if (empty? raw-cols)
-                     ["*"]
-                     (map #(name %) raw-cols))
-          alias    (alt relation)
-          where    (sel relation)]
-    (str "(SELECT " (str/join ", " cols)
-         " FROM " (to-sql (base relation))
-         (when-not (empty? where) (str " WHERE " where)) ")"))))
+(defmulti to-sql type)
+(defmethod to-sql String [relation] relation)
+(defmethod to-sql Relation [relation]
+  (let [raw-cols (proj relation)
+        cols     (if (empty? raw-cols) ["*"] (map #(name %) raw-cols))
+        alias    (alt relation)
+        where    (sel relation)]
+          (str "(SELECT " (str/join ", " cols)
+               " FROM " (to-sql (base relation))
+               (when-not (empty? where) (str " WHERE " where)) ")")))
 
 (defn max [col]
   (str "max(" (name col) ")"))
