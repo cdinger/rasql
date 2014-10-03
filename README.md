@@ -40,7 +40,7 @@ A clojure library for converting relational algebra expressions to SQL.
                 [:= (:effseq acad-prog) max-effseq-of-max-effdt-of-ps-acad_prog]]))
 
 (to-sql effective-acad-progs)
-;; (SELECT * FROM ps_acad_prog ap WHERE ((1 = 1) AND ((ap.effdt = (SELECT max(effdt) FROM ps_acad_prog WHERE ((1 = 1) AND ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt <= SYSDATE))))) AND (ap.effseq = (SELECT max(effseq) FROM ps_acad_prog WHERE ((1 = 1) AND ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt = effdt))))))))
+;; (SELECT * FROM ps_acad_prog ap WHERE ((ap.effdt = (SELECT max(effdt) FROM ps_acad_prog WHERE ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt <= SYSDATE)))) AND (ap.effseq = (SELECT max(effseq) FROM ps_acad_prog WHERE ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt = effdt))))))
 ```
 
 ## License
