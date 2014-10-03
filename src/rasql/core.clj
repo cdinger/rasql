@@ -23,6 +23,9 @@
   (valAt [_ k]
     (str (when-not (empty? relation-alias) (str relation-alias  ".")) (name k))))
 
+(defn new-relation [table-name & [alt sel proj joins]]
+  (Relation. table-name alt sel proj (or joins {})))
+
 (defn project [relation columns]
   ;; TODO: join existing projected columns?
   (Relation. (base relation) (alt relation) (sel relation) columns (joins relation)))
