@@ -1,4 +1,5 @@
 (ns rasql.core
+  (:refer-clojure :exclude [max])
   (:require [clojure.string :as str]))
 
 (defn wrap-parens [s]
