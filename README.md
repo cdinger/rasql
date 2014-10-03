@@ -19,19 +19,19 @@ A clojure library for converting relational algebra expressions to SQL.
 (def max-effdt-of-an-acad-prog
   (project
     (select inner-acad-prog
-      [:and [:= (:acad_prog acad-prog) (:acad_prog max-effdt-of-an-acad-prog)]
-            [:= (:emplid acad-prog) (:emplid max-effdt-of-an-acad-prog)]
-            [:= (:stdnt_car_nbr acad-prog) (:stdnt_car_nbr max-effdt-of-an-acad-prog)]
+      [:and [:= (:acad_prog acad-prog) :acad_prog]
+            [:= (:emplid acad-prog) :emplid]
+            [:= (:stdnt_car_nbr acad-prog) :stdnt_car_nbr]
             [:<= (:effdt acad-prog) "SYSDATE"]])
     [(max :effdt)]))
 
 (def max-effseq-of-max-effdt-of-ps-acad_prog
   (project
     (select inner-acad-prog
-      [:and [:= (:acad_prog acad-prog) (:acad_prog max-effdt-of-an-acad-prog)]
-            [:= (:emplid acad-prog) (:emplid max-effdt-of-an-acad-prog)]
-            [:= (:stdnt_car_nbr acad-prog) (:stdnt_car_nbr max-effdt-of-an-acad-prog)]
-            [:= (:effdt acad-prog) (:effdt max-effdt-of-an-acad-prog)]])
+      [:and [:= (:acad_prog acad-prog) :acad_prog]
+            [:= (:emplid acad-prog) :emplid]
+            [:= (:stdnt_car_nbr acad-prog) :stdnt_car_nbr]
+            [:= (:effdt acad-prog) :effdt]])
     [(max :effseq)]))
 
 (def effective-acad-progs
