@@ -40,6 +40,7 @@
 
 (defmulti to-sql type)
 (defmethod to-sql String [relation] relation)
+(defmethod to-sql clojure.lang.Keyword [word] (name word))
 (defmethod to-sql Relation [relation]
   (let [raw-cols (proj relation)
         cols     (if (empty? raw-cols) ["*"] (map #(name %) raw-cols))

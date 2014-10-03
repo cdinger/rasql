@@ -35,3 +35,16 @@
   (let [t (new-relation "table" "t1")]
     (is (= (to-sql (project t [(:id t)]))
            "(SELECT t1.id FROM table t1)"))))
+
+;; to-sql selection
+
+(deftest select-single-test
+  (let [t (new-relation "table")]
+    (is (= (to-sql (select t [:= :id "123"]))
+           "(SELECT * FROM table WHERE (id = 123))"))))
+
+(deftest select-single-table-col-test
+  (let [t (new-relation "table")]
+    (is (= (to-sql (select t [:= (:id t) "123"]))
+           "(SELECT * FROM table WHERE (id = 123))"))))
+
