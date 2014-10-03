@@ -31,7 +31,8 @@
   (Relation. (base relation) (alt relation) (sel relation) columns (joins relation)))
 
 (defn select [relation predicate]
-  (Relation. (base relation) (alt relation) [:and (or (sel relation) [:= "1" "1"]) predicate] (proj relation) (joins relation)))
+  ; (Relation. (base relation) (alt relation) [:and (or (sel relation) [:= "1" "1"]) predicate] (proj relation) (joins relation)))
+  (Relation. (base relation) (alt relation) (if (sel relation) [:and (sel relation) predicate] predicate) (proj relation) (joins relation)))
 
 (defn join [relation join-relation join-predicate]
   ;; TODO: what checks are required on sels and projs?

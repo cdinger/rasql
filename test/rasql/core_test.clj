@@ -48,3 +48,9 @@
     (is (= (to-sql (select t [:= (:id t) "123"]))
            "(SELECT * FROM table WHERE (id = 123))"))))
 
+(deftest select-multiple-predicates-test
+  (let [t (new-relation "blah")
+        t' (select t [:= (:a t) "123"])
+        t'' (select t' [:= (:b t) "456"])]
+    (is (= (to-sql t'')
+           "(SELECT * FROM blah WHERE ((a = 123) AND (b = 456)))"))))
