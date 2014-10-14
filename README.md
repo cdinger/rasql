@@ -2,13 +2,36 @@
 
 A clojure library for converting relational algebra expressions to SQL.
 
-## Usage
+## Basic usage
 
 ``` clojure
 (def person (new-relation "ps_person"))
+
 (to-sql (project person [:emplid :dob]))
 ;; "(SELECT emplid, dob FROM ps_person)"
+
+(to-sql (select person [:= :emplid "1234567"]))
+;; (SELECT * FROM ps_person WHERE (emplid = '1234567'))
 ```
+## Everything is a relation
+
+The result of every projection, selection, join (and others) is just a relation. This lets you compose
+smaller relations to get around any wackyness your database schema is imposing on you.
+
+```clojure
+(def person (new-relation "ps_person"))
+
+(type person)
+;; rasql.core.Relation
+
+(type (project person [:emplid :dob]))
+;; rasql.core.Relation
+
+(type (select person [:= :emplid "1234567"]))
+;; rasql.core.Relation
+```
+
+##
 
 ## Compose queries with multiple relations
 
