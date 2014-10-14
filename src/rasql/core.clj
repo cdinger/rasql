@@ -1,6 +1,8 @@
 (ns rasql.core
   (:refer-clojure :exclude [max])
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str])
+  (:import (java.util Date)
+           (java.text SimpleDateFormat)))
 
 (defn wrap-parens [s]
   (str "(" s ")"))
@@ -45,6 +47,7 @@
 (defmulti to-sql type)
 (defmethod to-sql String [s] (str "'" s "'"))
 (defmethod to-sql Long [n] (str n))
+(defmethod to-sql java.util.Date [d] (str "'" (.format (java.text.SimpleDateFormat. "yyyy-MM-dd") d) "'"))
 (defmethod to-sql clojure.lang.Keyword [word] (name word))
 (defmethod to-sql Table [table] (:table-name table))
 (defmethod to-sql Column [column] (str (when-not (nil? (:relation-alias column)) (str (:relation-alias column)  ".")) (:column-name column)))

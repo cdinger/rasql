@@ -1,6 +1,7 @@
 (ns rasql.core-test
   (:require [clojure.test :refer :all]
-            [rasql.core :refer :all]))
+            [rasql.core :refer :all])
+  (:import (java.util GregorianCalendar)))
 
 ;; Relation
 
@@ -54,3 +55,8 @@
         t'' (select t' [:= (:b t) 456])]
     (is (= (to-sql t'')
            "(SELECT * FROM blah WHERE ((a = '123') AND (b = 456)))"))))
+
+(deftest date-predicate-test
+  (let [d (.getTime (GregorianCalendar. 2014 0 14))]
+    (is (= (to-sql [:= :asdf d])
+           "(asdf = '2014-01-14')"))))
