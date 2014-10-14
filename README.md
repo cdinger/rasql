@@ -22,7 +22,7 @@ A clojure library for converting relational algebra expressions to SQL.
       [:and [:= (:acad_prog acad-prog) :acad_prog]
             [:= (:emplid acad-prog) :emplid]
             [:= (:stdnt_car_nbr acad-prog) :stdnt_car_nbr]
-            [:<= (:effdt acad-prog) "SYSDATE"]])
+            [:<= (:effdt acad-prog) (java.util.Date.)]])
     [(max :effdt)]))
 
 (def max-effseq-of-max-effdt-of-ps-acad_prog
@@ -40,7 +40,7 @@ A clojure library for converting relational algebra expressions to SQL.
                 [:= (:effseq acad-prog) max-effseq-of-max-effdt-of-ps-acad_prog]]))
 
 (to-sql effective-acad-progs)
-;; (SELECT * FROM ps_acad_prog ap WHERE ((ap.effdt = (SELECT max(effdt) FROM ps_acad_prog WHERE ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt <= SYSDATE)))) AND (ap.effseq = (SELECT max(effseq) FROM ps_acad_prog WHERE ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt = effdt))))))
+;; (SELECT * FROM ps_acad_prog ap WHERE ((ap.effdt = (SELECT max(effdt) FROM ps_acad_prog WHERE ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt <= '2014-10-14')))) AND (ap.effseq = (SELECT max(effseq) FROM ps_acad_prog WHERE ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt = effdt))))))
 ```
 
 ## License
