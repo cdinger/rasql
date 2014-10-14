@@ -5,6 +5,9 @@
 (defn wrap-parens [s]
   (str "(" s ")"))
 
+(defrecord Table [table-name])
+(defrecord Column [column-name relation-alias])
+
 (defprotocol IRelation
   (base [this])
   (alt [this])
@@ -21,17 +24,17 @@
   (proj [_] projection)
   (joins [_] joins)
   (valAt [_ k]
-    (str (when-not (empty? relation-alias) (str relation-alias  ".")) (name k))))
+    ; (str (when-not (empty? relation-alias) (str relation-alias  ".")) (name k))))
+    (->Column (name k) relation-alias)))
 
 (defn new-relation [table-name & [alt sel proj joins]]
-  (Relation. table-name alt sel proj (or joins {})))
+  (Relation. (->Table table-name) alt sel proj (or joins {})))
 
 (defn project [relation columns]
   ;; TODO: join existing projected columns?
   (Relation. (base relation) (alt relation) (sel relation) columns (joins relation)))
 
 (defn select [relation predicate]
-  ; (Relation. (base relation) (alt relation) [:and (or (sel relation) [:= "1" "1"]) predicate] (proj relation) (joins relation)))
   (Relation. (base relation) (alt relation) (if (sel relation) [:and (sel relation) predicate] predicate) (proj relation) (joins relation)))
 
 (defn join [relation join-relation join-predicate]
@@ -40,11 +43,14 @@
                                                                             :predicate join-predicate}))
 
 (defmulti to-sql type)
-(defmethod to-sql String [relation] relation)
+(defmethod to-sql String [s] (str "'" s "'"))
+(defmethod to-sql Long [n] (str n))
 (defmethod to-sql clojure.lang.Keyword [word] (name word))
+(defmethod to-sql Table [table] (:table-name table))
+(defmethod to-sql Column [column] (str (when-not (nil? (:relation-alias column)) (str (:relation-alias column)  ".")) (:column-name column)))
 (defmethod to-sql Relation [relation]
   (let [raw-cols (proj relation)
-        cols     (if (empty? raw-cols) ["*"] (map #(name %) raw-cols))
+        cols     (if (empty? raw-cols) ["*"] (map #(to-sql %) raw-cols))
         alt      (alt relation)
         where    (sel relation)
         joins    (joins relation)]
@@ -60,7 +66,7 @@
         operands (vec (rest predicate))]
     (if (contains? #{:and :or} operator)
       (wrap-parens (str/join (str " " (str/upper-case (name operator)) " ") (map #(to-sql %) operands)))
-      (wrap-parens (str/join " " [(to-sql (to-sql (first operands)))
+      (wrap-parens (str/join " " [(to-sql (first operands))
                                   (name operator)
                                   (to-sql (last operands))])))))
 
