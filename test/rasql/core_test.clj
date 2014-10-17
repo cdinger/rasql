@@ -60,3 +60,33 @@
   (let [d (.getTime (GregorianCalendar. 2014 0 14))]
     (is (= (to-sql [:= :asdf d])
            "(asdf = '2014-01-14')"))))
+
+(deftest predicate-value-first-test
+    (is (= (to-sql [:= 123 :id])
+        "(123 = id)")))
+
+;; join
+
+(deftest join-test
+  (let [p (new-relation "person" "p")
+        n (new-relation "names" "n")
+        p-n (join p n [:= (:emplid p) (:emplid n)])]
+    (is (= (to-sql p-n)
+           "(SELECT * FROM person p JOIN names n ON (p.emplid = n.emplid))"))))
+
+(deftest multi-join-test
+  (let [p (new-relation "person" "p")
+        n (new-relation "names" "n")
+        e (new-relation "email_addresses" "e")
+        p-n (join p n [:= (:emplid p) (:emplid n)])
+        p-n-e (join p-n e [:= (:emplid p-n) (:emplid e)])]
+    (is (= (to-sql p-n-e)
+           "(SELECT * FROM (SELECT * FROM person p JOIN names n ON (p.emplid = n.emplid)) p JOIN email_addresses e ON (p.emplid = e.emplid))"))))
+
+;; intersect
+
+(deftest intersect-test
+  (let [a (new-relation "a")
+        b (new-relation "b")]
+    (is (= (to-sql (intersect a b))
+           "(SELECT * FROM (SELECT * FROM a)) INTERSECT (SELECT * FROM b)"))))

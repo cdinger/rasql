@@ -15,9 +15,10 @@
   (alt [this])
   (sel [this])
   (proj [this])
-  (joins [this]))
+  (joins [this])
+  (intersection [this]))
 
-(deftype Relation [base-relation relation-alias selection projection joins]
+(deftype Relation [base-relation relation-alias selection projection joins intersect-with]
   IRelation
   clojure.lang.ILookup
   (base [_] base-relation)
@@ -25,24 +26,31 @@
   (sel [_] selection)
   (proj [_] projection)
   (joins [_] joins)
+  (intersection [_] intersect-with)
   (valAt [_ k]
     ; (str (when-not (empty? relation-alias) (str relation-alias  ".")) (name k))))
     (->Column (name k) relation-alias)))
 
-(defn new-relation [table-name & [alt sel proj joins]]
-  (Relation. (->Table table-name) alt sel proj (or joins {})))
+(defn new-relation [table-name & [alt sel proj joins intersection]]
+  (Relation. (->Table table-name) alt sel proj (or joins {}) intersection))
 
 (defn project [relation columns]
   ;; TODO: join existing projected columns?
-  (Relation. (base relation) (alt relation) (sel relation) columns (joins relation)))
+  (Relation. (base relation) (alt relation) (sel relation) columns (joins relation) (intersection relation)))
 
 (defn select [relation predicate]
-  (Relation. (base relation) (alt relation) (if (sel relation) [:and (sel relation) predicate] predicate) (proj relation) (joins relation)))
+  (Relation. (base relation) (alt relation) (if (sel relation) [:and (sel relation) predicate] predicate) (proj relation) (joins relation) (intersection relation)))
 
 (defn join [relation join-relation join-predicate]
   ;; TODO: what checks are required on sels and projs?
   (Relation. (base relation) (alt relation) (sel relation) (proj relation) {:relation join-relation
-                                                                            :predicate join-predicate}))
+                                                                            :predicate join-predicate} (intersection relation)))
+
+(defn intersect [r1 r2]
+  (Relation. r1 nil nil nil {} r2))
+
+(defn empty-relation? [r]
+  (and (empty? (sel r)) (empty? (proj r)) (empty? (joins r))))
 
 (defmulti to-sql type)
 (defmethod to-sql String [s] (str "'" s "'"))
@@ -54,16 +62,21 @@
 (defmethod to-sql Relation [relation]
   (let [raw-cols (proj relation)
         cols     (if (empty? raw-cols) ["*"] (map #(to-sql %) raw-cols))
-        alt      (alt relation)
+        al       (alt relation)
         where    (sel relation)
-        joins    (joins relation)]
-          (wrap-parens (str "SELECT " (str/join ", " cols)
-                            " FROM " (to-sql (base relation))
-                            (when-not (empty? joins)
-                              (str " JOIN " (to-sql (:relation joins)) " ON " (:predicate joins)))
-                            (when-not (empty? alt)
-                              (str " " alt))
-                            (when-not (empty? where) (str " WHERE " (to-sql where)))))))
+        joins    (joins relation)
+        intersection (intersection relation)]
+          (str "(SELECT " (str/join ", " cols)
+               " FROM " (to-sql (base relation))
+               (when-not (empty? al)
+                 (str " " al))
+               (when-not (empty? joins)
+                 (str " JOIN " (if (empty-relation? (:relation joins))
+                                   (to-sql (base (:relation joins)))
+                                   (to-sql (:relation joins)))
+                      " " (alt (:relation joins)) " ON " (to-sql (:predicate joins))))
+               (when-not (empty? where) (str " WHERE " (to-sql where))) ")"
+               (when-not (nil? intersection) (str " INTERSECT " (to-sql intersection))))))
 (defmethod to-sql clojure.lang.PersistentVector [predicate]
   (let [operator (first predicate)
         operands (vec (rest predicate))]
