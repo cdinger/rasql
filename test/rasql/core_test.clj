@@ -89,7 +89,7 @@
   (let [a (new-relation "a")
         b (new-relation "b")]
     (is (= (to-sql (intersect a b))
-           "(SELECT * FROM (SELECT * FROM a)) INTERSECT (SELECT * FROM b)"))))
+           "((SELECT * FROM (SELECT * FROM a)) INTERSECT (SELECT * FROM b))"))))
 
 ;; union
 
@@ -97,4 +97,4 @@
   (let [a (new-relation "a")
         b (new-relation "b")]
     (is (= (to-sql (union a b))
-           "(SELECT * FROM (SELECT * FROM a)) UNION (SELECT * FROM b)"))))
+           "((SELECT * FROM (SELECT * FROM a)) UNION (SELECT * FROM b))"))))

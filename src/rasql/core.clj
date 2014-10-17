@@ -70,19 +70,20 @@
         where    (sel relation)
         joins    (joins relation)
         intersection (intersection relation)
-        union-   (union* relation)]
-          (str "(SELECT " (str/join ", " cols)
-               " FROM " (to-sql (base relation))
-               (when-not (empty? al)
-                 (str " " al))
-               (when-not (empty? joins)
-                 (str " JOIN " (if (empty-relation? (:relation joins))
-                                   (to-sql (base (:relation joins)))
-                                   (to-sql (:relation joins)))
-                      " " (alt (:relation joins)) " ON " (to-sql (:predicate joins))))
-               (when-not (empty? where) (str " WHERE " (to-sql where))) ")"
-               (when-not (nil? intersection) (str " INTERSECT " (to-sql intersection)))
-               (when-not (nil? union-) (str " UNION " (to-sql union-))))))
+        union-   (union* relation)
+        base               (str "(SELECT " (str/join ", " cols)
+                                " FROM " (to-sql (base relation))
+                                (when-not (empty? al)
+                                  (str " " al))
+                                (when-not (empty? joins)
+                                  (str " JOIN " (if (empty-relation? (:relation joins))
+                                                    (to-sql (base (:relation joins)))
+                                                    (to-sql (:relation joins)))
+                                       " " (alt (:relation joins)) " ON " (to-sql (:predicate joins))))
+                                (when-not (empty? where) (str " WHERE " (to-sql where))) ")")
+        intersected (when-not (nil? intersection) (wrap-parens (str base " INTERSECT " (to-sql intersection))))
+        unioned     (when-not (nil? union-) (wrap-parens(str base " UNION " (to-sql union-))))]
+    (or unioned intersected base)))
 (defmethod to-sql clojure.lang.PersistentVector [predicate]
   (let [operator (first predicate)
         operands (vec (rest predicate))]
