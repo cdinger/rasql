@@ -20,14 +20,14 @@
 
 (defrecord Column [relation column])
 (defrecord Aggregate [function column rename])
-(defrecord Join [relation])
+(defrecord Join [relation predicate])
 (defrecord Projection [columns])
 
 (deftype Relation [base base-alias relation-alias selection projection joins]
   IRelation
   clojure.lang.ILookup
   (base [_] base)
-  (base-alias [this] (or base-alias (when (= (type base) String) base (unnamed-relation-alias base))))
+  (base-alias [this] base-alias) ;; (or base-alias (when (= (type base) String) base (unnamed-relation-alias base))))
   (relation-alias [_] relation-alias)
   (selection [_] selection)
   (projection [_] projection)
@@ -78,8 +78,8 @@
 
 (defmethod to-sql Column [c]
   (let [column (:column c)
-        base-alias (base-alias (:relation c))]
-    (str base-alias "." column)))
+        relation-alias (relation-alias (:relation c))]
+    (str relation-alias "." column)))
 
 (defmethod to-sql Aggregate [a]
   (let [function (name (:function a))
@@ -106,8 +106,9 @@
 
 (defmethod to-sql Join [j]
   (let [relation (:relation j)
-        relation-alias (relation-alias relation)]
-    (str " JOIN " (to-sql relation) " " relation-alias)))
+        relation-alias (relation-alias relation)
+        predicate (:predicate j)]
+    (str " JOIN " (to-sql relation) " " relation-alias " ON " (to-sql predicate))))
 
 (defmethod to-sql String [s]
   s)
@@ -118,9 +119,9 @@
         selection (selection relation)
         columns (or (to-sql projection) "*")
         joins (joins relation)
-        alias (when (= (type base) Relation) (str " " (relation-alias base)))
+        alias (relation-alias relation) ;; (when (= (type base) Relation) (str " " (relation-alias base)))
         select-clause (to-sql projection)
-        from-clause (str " FROM " (to-sql base) alias)
+        from-clause (str " FROM " (to-sql base) " " alias)
         join-clause (to-sql joins)
         where-clause (when-not (empty? selection) (str " WHERE " (to-sql selection)))]
     (wrap-parens (str select-clause
@@ -130,22 +131,31 @@
 
 ;;;;;;;;;;;;;;;;;;;;
 
+(defrelation acad-prog "ps_acad_prog")
+
+(to-sql (project (project acad-prog [(:emplid acad-prog) (:acad_career acad-prog)]) [(:* acad-prog)]))
+
+
 (defrelation eff-names "ps_names")
 (defrelation eff-blah eff-names)
+(defrelation eff-whoa eff-blah)
 
 (to-sql eff-names)
+(to-sql (project eff-blah [(:id eff-blah)]))
 (to-sql eff-blah)
+(to-sql eff-whoa)
 
 (to-sql (select eff-blah [:or [:= (:id eff-blah) "123"]
-                               [:= (:id eff-blah) "456"]]))
+                              [:= (:id eff-blah) "456"]]))
 
 (to-sql (Projection. [(:id eff-blah)]))
 (to-sql (Projection. [(:effdt eff-blah)]))
 (to-sql (Projection. [(:id eff-names)]))
 (to-sql (Projection. [(:* eff-names)]))
 
-(to-sql (Join. eff-names))
-(to-sql (Join. eff-blah))
+(to-sql (Join. eff-names [:= (:id eff-names) (:id eff-blah)]))
+(relation-alias eff-blah)
+(base-alias eff-blah)
 
 ;; (select eff-blah [:= (:id eff-blah) (:id eff-names)])
 
@@ -163,9 +173,10 @@
                 (maximum (:effdt ps-acad-prog) "effdt")])
       (select [:<= (:effdt ps-acad-prog) "SYSDATE"])))
 (to-sql max-effdt-of-each-acad-prog)
-;; (defrelation max-effdt-and-effseq-of-each-acad-prog
-;;   (project ps-acad-prog [(:emplid max-effdt-of-each-acad-prog)
-;;                          (:acad_career max-effdt-of-each-acad-prog)
-;;                          (:stndt_car_nbr max-effdt-of-each-acad-prog)
-;;                          (:effdt max-effdt-of-each-acad-prog)
-;;                          (maximum (:effseq max-effdt-of-each-acad-prog) "effseq")]))
+(defrelation max-effdt-and-effseq-of-each-acad-prog
+  (project max-effdt-of-each-acad-prog [(:emplid max-effdt-of-each-acad-prog)
+                                        (:acad_career max-effdt-of-each-acad-prog)
+                                        (:stndt_car_nbr max-effdt-of-each-acad-prog)
+                                        (:effdt max-effdt-of-each-acad-prog)
+                                        (maximum (:effseq max-effdt-of-each-acad-prog) "effseq")]))
+(to-sql max-effdt-and-effseq-of-each-acad-prog)
