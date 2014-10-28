@@ -1,144 +1,139 @@
+;; # Core principles
+;;
+;; 1. every relation must have a name
+;;   - if you don't provide one, a nasty but unique one will be created
+;; 2. RA-focused; this is not a DSL for SQL.
+;;
 (ns rasql.core
-  (:require [clojure.string :as str])
-  (:import (java.util Date)
-           (java.text SimpleDateFormat)))
+  (:require [clojure.string :as str]))
 
-(declare to-sql)
-
-(defn wrap-parens [s]
-  (str "(" s ")"))
-
-(defn uniq-alias [table]
-  ;; TODO: it'd be better use
-  ;; (str (:table-name table) "_" (System/identityHashCode table)))
-  (str (:table-name table)))
-
-(defrecord Table [table-name alt])
-(defrecord Column [column-name relation-alias])
-(defrecord Aggregate [function column rename])
+(defn unnamed-relation-alias [relation]
+  (str "unnamed-relation-" (System/identityHashCode relation)))
 
 (defprotocol IRelation
   (base [this])
-  (alt [this])
+  (base-alias [this])
+  (relation-alias [this])
   (sel [this])
-  (proj [this])
+  (projection [this])
   (joins [this])
   (intersection [this])
   (union* [this]))
 
-(deftype Relation [table-or-relation relation-alias selection projection joins intersect-with union-with]
+(defrecord Column [relation column])
+(defrecord Join [relation])
+(defrecord Projection [columns])
+;; (defrecord Predicate [conditions])
+
+(deftype Relation [base base-alias relation-alias selection projection joins intersect-with union-with]
   IRelation
   clojure.lang.ILookup
-  (base [_] table-or-relation)
-  (alt [_] relation-alias)
+  (base [_] base)
+  (base-alias [this] (or base-alias (when (= (type base) String) base (unnamed-relation-alias base))))
+  (relation-alias [_] relation-alias)
   (sel [_] selection)
-  (proj [_] projection)
+  (projection [_] projection)
   (joins [_] joins)
   (intersection [_] intersect-with)
   (union* [_] union-with)
-  (valAt [_ k]
-    (->Column (name k) relation-alias)))
+  (valAt [this k]
+    (->Column this (name k))))
 
-(defn new-relation [table-name & [alt sel proj joins intersection union-]]
-  (let [table (->Table table-name alt)]
-    ;; (Relation. table (or alt (uniq-alias table)) sel proj (or joins {}) intersection union-)))
-    (Relation. table alt sel proj (or joins {}) intersection union-)))
+(defmacro defrelation [relation-name base]
+  `(def ~relation-name (Relation. ~base (if (= (type ~base) String) ~base (unnamed-relation-alias ~base)) (name '~relation-name) nil (->Projection []) nil nil nil)))
+
+;;;;;; convenience methods
 
 (defn project [relation columns]
-  ;; (let [cols (map #(when-not (= (type %) Column) (->Column (name %) (alt relation))) columns)]
-    (Relation. (base relation) (alt relation) (sel relation) columns (joins relation) (intersection relation) (union* relation)))
+  (map #(:relation %) columns)
+  (->Projection columns))
 
+;; (defn select [relation raw-predicate]
+;;   (->Predicate (map #(->Predicate %) raw-predicate)))
 
-(defn select [relation predicate]
-  (Relation. (base relation) (alt relation) (if (sel relation) [:and (sel relation) predicate] predicate) (proj relation) (joins relation) (intersection relation) (union* relation)))
+;;;;;; SQL
 
-(defn join [relation join-relation join-predicate]
-  ;; TODO: what checks are required on sels and projs?
-  (Relation. (base relation) (alt relation) (sel relation) (proj relation) {:relation join-relation
-                                                                            :predicate join-predicate} (intersection relation) (union* relation)))
-(defn rename [relation new-name]
-  (Relation. (base relation) new-name (sel relation) (proj relation) (joins relation) (intersection relation) (union* relation)))
-
-(defn intersect [r1 r2]
-  (Relation. r1 nil nil nil {} r2 nil))
-
-(defn union [r1 r2]
-  (Relation. r1 nil nil nil {} nil r2))
-
-(defn empty-relation? [r]
-  (and (empty? (sel r)) (empty? (proj r)) (empty? (joins r))))
-
-(defn contains-other-relations? [r]
-  false)
-
-
-(defn group-by-sql [relation]
-  (let [cols     (proj relation)
-        aggs     (filter #(= (type %) Aggregate) cols)
-        non-aggs (filter #(= (type %) Column) cols)
-        sql      (when-not (empty? aggs) (str " GROUP BY " (str/join ", " (map #(to-sql %) non-aggs))))]
-  sql))
+(defn wrap-parens [s]
+  (str "(" s ")"))
 
 (defmulti to-sql type)
-(defmethod to-sql String [s] (str "'" s "'"))
-(defmethod to-sql Long [n] (str n))
-(defmethod to-sql java.util.Date [d] (str "'" (.format (java.text.SimpleDateFormat. "yyyy-MM-dd") d) "'"))
-(defmethod to-sql clojure.lang.Keyword [word] (name word))
-(defmethod to-sql Table [table]
-  (let [table-name (:table-name table)
-        alt (:alt table)]
-  (str table-name (when-not (empty? alt) (str " " alt " ")))))
-(defmethod to-sql Column [column]
-  (let [relation-name (:relation-alias column)
-        column-name   (:column-name column)]
-    (str (when-not (empty? relation-name) (str relation-name ".")) column-name)))
-(defmethod to-sql Aggregate [agg]
-  (let [func   (name (:function agg))
-        col    (to-sql (:column agg))
-        rename (:rename agg)]
-    (str func (wrap-parens col) " as " rename)))
-(defmethod to-sql Relation [relation]
-  (let [raw-cols (proj relation)
-        al       (alt relation)
-        cols     (if (empty? raw-cols) [(str (when-not (empty? al) (str al ".")) "*")] (map #(to-sql %) raw-cols))
-        where    (sel relation)
-        joins    (joins relation)
-        intersection (intersection relation)
-        union-   (union* relation)
-        base               (str "(SELECT " (str/join ", " cols)
-                                " FROM " (to-sql (base relation))
-                                (when-not (empty? joins)
-                                  (str " JOIN " (if (empty-relation? (:relation joins))
-                                                    (to-sql (base (:relation joins)))
-                                                    (to-sql (:relation joins)))
-                                       " ON " (to-sql (:predicate joins))))
-                                (when-not (empty? where) (str " WHERE " (to-sql where)))
-                                (group-by-sql relation)
-                                ")")
-        intersected (when-not (nil? intersection) (wrap-parens (str base " INTERSECT " (to-sql intersection))))
-        unioned     (when-not (nil? union-) (wrap-parens(str base " UNION " (to-sql union-))))]
-    (str (or unioned intersected base) (when-not (empty? al) (str " " al)))))
-(defmethod to-sql clojure.lang.PersistentVector [predicate]
-  (let [operator (first predicate)
-        operands (vec (rest predicate))]
+
+(defmethod to-sql nil [_])
+
+(defmethod to-sql clojure.lang.Keyword [k]
+  (name k))
+
+(defmethod to-sql String [s]
+  (str "'" s "'"))
+
+(defmethod to-sql Column [c]
+  (let [column (:column c)
+        base-alias (base-alias (:relation c))]
+    (str base-alias "." column)))
+
+(defmethod to-sql Projection [p]
+  (let [raw-columns (:columns p)
+        columns (str/join ", " (map #(to-sql %) raw-columns))
+        sql-columns (if (empty? raw-columns) "*" columns)
+        sql (str "SELECT " sql-columns)]
+    sql))
+
+(defmethod to-sql clojure.lang.PersistentVector [p]
+  (let [operator (first p)
+        operands (rest p)]
     (if (contains? #{:and :or} operator)
       (wrap-parens (str/join (str " " (str/upper-case (name operator)) " ") (map #(to-sql %) operands)))
       (wrap-parens (str/join " " [(to-sql (first operands))
                                   (name operator)
                                   (to-sql (last operands))])))))
 
-(defn max [col & rename]
-  (->Aggregate :max col rename))
+;; (defmethod to-sql Predicate [p]
+;;   (let [conditions (:conditions p)
+;;         operator (first conditions)
+;;         operands (rest conditions)]
+;;     (if (contains? #{:and :or} operator)
+;;       (wrap-parens (str/join (str " " (str/upper-case (name operator)) " ") (map #(to-sql %) operands)))
+;;       (wrap-parens (str/join " " [(to-sql (first operands))
+;;                                   (name operator)
+;;                                   (to-sql (last operands))])))))
 
-(def acad-prog-tbl (new-relation "ps_acad_prog_tbl"))
-(def eff-keys-acad-prog-tbl (-> acad-prog-tbl
-                                (project [(:institution acad-prog-tbl), (:acad_prog acad-prog-tbl), (max (:effdt acad-prog-tbl) "effdt")])
-                                (select [:<= :effdt (Date.)])
-                                (rename "poo")))
+(defmethod to-sql Join [j]
+  (let [relation (:relation j)
+        relation-alias (relation-alias relation)]
+    (str " JOIN " (to-sql relation) " " relation-alias)))
 
-(def eff-acad-prog-tbl (-> acad-prog-tbl
-                           (join eff-keys-acad-prog-tbl [:and [:= (:institution acad-prog-tbl) (:institution eff-keys-acad-prog-tbl)]
-                                                              [:= (:acad_prog acad-prog-tbl) (:acad_prog eff-keys-acad-prog-tbl)]
-                                                              [:= (:effdt acad-prog-tbl) (:effdt eff-keys-acad-prog-tbl)]])))
+(defmethod to-sql String [s]
+  s)
 
-(to-sql eff-acad-prog-tbl)
+(defmethod to-sql Relation [relation]
+  (let [base (base relation)
+        projection (projection relation)
+        columns (or (to-sql projection) "*")
+        joins (joins relation)
+        alias (when (= (type base) Relation) (str " " (relation-alias base)))]
+    (str "(" (to-sql projection)
+         " FROM " (to-sql base) alias
+         (to-sql joins) ")")))
+
+;;;;;;;;;;;;;;;;;;;;
+
+(defrelation eff-names "ps_names")
+(defrelation eff-blah eff-names)
+
+(to-sql eff-names)
+(to-sql eff-blah)
+
+(to-sql (Projection. [(:id eff-blah)]))
+(to-sql (Projection. [(:effdt eff-blah)]))
+(to-sql (Projection. [(:id eff-names)]))
+(to-sql (Projection. [(:* eff-names)]))
+
+(to-sql (Join. eff-names))
+(to-sql (Join. eff-blah))
+
+(select eff-blah [:= (:id eff-blah) (:id eff-names)])
+
+(to-sql [:= (:id eff-blah) (:id eff-names)])
+(to-sql [:or [:= (:id eff-blah) "12345"]
+             [:= (:id eff-blah) "52372"]
+             [:= (:id eff-blah) "239746"]])
