@@ -66,6 +66,14 @@
 (defn wrap-parens [s]
   (str "(" s ")"))
 
+(defn group-by-sql [p]
+  (let [cols (:columns p)
+        aggs (filter #(= (type %) Aggregate) cols)
+        non-aggs (filter #(= (type %) Column) cols)
+        non-aggs-sql (map #(to-sql %) non-aggs)
+        sql (when-not (empty? aggs) (str " GROUP BY " (str/join ", " non-aggs-sql)))]
+    sql))
+
 (defmulti to-sql type)
 
 (defmethod to-sql nil [_])
@@ -123,11 +131,13 @@
         select-clause (to-sql projection)
         from-clause (str " FROM " (to-sql base) " " alias)
         join-clause (to-sql joins)
-        where-clause (when-not (empty? selection) (str " WHERE " (to-sql selection)))]
+        where-clause (when-not (empty? selection) (str " WHERE " (to-sql selection)))
+        group-by-clause (group-by-sql projection)]
     (wrap-parens (str select-clause
                       from-clause
                       join-clause
-                      where-clause))))
+                      where-clause
+                      group-by-clause))))
 
 ;;;;;;;;;;;;;;;;;;;;
 
@@ -139,6 +149,7 @@
 (defrelation eff-names "ps_names")
 (defrelation eff-blah eff-names)
 (defrelation eff-whoa eff-blah)
+
 
 (to-sql eff-names)
 (to-sql (project eff-blah [(:id eff-blah)]))
@@ -180,3 +191,7 @@
                                         (:effdt max-effdt-of-each-acad-prog)
                                         (maximum (:effseq max-effdt-of-each-acad-prog) "effseq")]))
 (to-sql max-effdt-and-effseq-of-each-acad-prog)
+
+
+(defrelation emplid-and-max-effdt (project acad-prog [(:emplid acad-prog) (maximum (:effdt acad-prog) "max_effdt")]))
+(to-sql emplid-and-max-effdt)
