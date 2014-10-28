@@ -14,42 +14,52 @@
   (base [this])
   (base-alias [this])
   (relation-alias [this])
-  (sel [this])
+  (selection [this])
   (projection [this])
-  (joins [this])
-  (intersection [this])
-  (union* [this]))
+  (joins [this]))
 
 (defrecord Column [relation column])
+(defrecord Aggregate [function column rename])
 (defrecord Join [relation])
 (defrecord Projection [columns])
-;; (defrecord Predicate [conditions])
 
-(deftype Relation [base base-alias relation-alias selection projection joins intersect-with union-with]
+(deftype Relation [base base-alias relation-alias selection projection joins]
   IRelation
   clojure.lang.ILookup
   (base [_] base)
   (base-alias [this] (or base-alias (when (= (type base) String) base (unnamed-relation-alias base))))
   (relation-alias [_] relation-alias)
-  (sel [_] selection)
+  (selection [_] selection)
   (projection [_] projection)
   (joins [_] joins)
-  (intersection [_] intersect-with)
-  (union* [_] union-with)
   (valAt [this k]
     (->Column this (name k))))
 
 (defmacro defrelation [relation-name base]
-  `(def ~relation-name (Relation. ~base (if (= (type ~base) String) ~base (unnamed-relation-alias ~base)) (name '~relation-name) nil (->Projection []) nil nil nil)))
+  `(def ~relation-name (Relation. ~base (if (= (type ~base) String) ~base (unnamed-relation-alias ~base)) (name '~relation-name) nil (->Projection []) nil)))
 
 ;;;;;; convenience methods
 
 (defn project [relation columns]
-  (map #(:relation %) columns)
-  (->Projection columns))
+  (let [base (base relation)
+        base-alias (base-alias relation)
+        relation-alias (relation-alias relation)
+        selection (selection relation)
+        projection (->Projection columns)
+        joins (joins relation)]
+    (Relation. base base-alias relation-alias selection projection joins)))
 
-;; (defn select [relation raw-predicate]
-;;   (->Predicate (map #(->Predicate %) raw-predicate)))
+(defn select [relation predicate]
+  (let [base (base relation)
+        base-alias (base-alias relation)
+        relation-alias (relation-alias relation)
+        selection predicate
+        projection (projection relation)
+        joins (joins relation)]
+    (Relation. base base-alias relation-alias selection projection joins)))
+
+(defn maximum [column rename]
+  (->Aggregate :max column rename))
 
 ;;;;;; SQL
 
@@ -71,6 +81,12 @@
         base-alias (base-alias (:relation c))]
     (str base-alias "." column)))
 
+(defmethod to-sql Aggregate [a]
+  (let [function (name (:function a))
+        column (to-sql (:column a))
+        rename (to-sql (:rename a))]
+  (str function (wrap-parens column) " AS \"" rename "\"")))
+
 (defmethod to-sql Projection [p]
   (let [raw-columns (:columns p)
         columns (str/join ", " (map #(to-sql %) raw-columns))
@@ -80,22 +96,13 @@
 
 (defmethod to-sql clojure.lang.PersistentVector [p]
   (let [operator (first p)
-        operands (rest p)]
-    (if (contains? #{:and :or} operator)
-      (wrap-parens (str/join (str " " (str/upper-case (name operator)) " ") (map #(to-sql %) operands)))
-      (wrap-parens (str/join " " [(to-sql (first operands))
-                                  (name operator)
-                                  (to-sql (last operands))])))))
-
-;; (defmethod to-sql Predicate [p]
-;;   (let [conditions (:conditions p)
-;;         operator (first conditions)
-;;         operands (rest conditions)]
-;;     (if (contains? #{:and :or} operator)
-;;       (wrap-parens (str/join (str " " (str/upper-case (name operator)) " ") (map #(to-sql %) operands)))
-;;       (wrap-parens (str/join " " [(to-sql (first operands))
-;;                                   (name operator)
-;;                                   (to-sql (last operands))])))))
+        operands (rest p)
+        predicate-sql (if (contains? #{:and :or} operator)
+                        (wrap-parens (str/join (str " " (str/upper-case (name operator)) " ") (map #(to-sql %) operands)))
+                        (wrap-parens (str/join " " [(to-sql (first operands))
+                                                    (name operator)
+                                                    (to-sql (last operands))])))]
+    predicate-sql))
 
 (defmethod to-sql Join [j]
   (let [relation (:relation j)
@@ -108,12 +115,18 @@
 (defmethod to-sql Relation [relation]
   (let [base (base relation)
         projection (projection relation)
+        selection (selection relation)
         columns (or (to-sql projection) "*")
         joins (joins relation)
-        alias (when (= (type base) Relation) (str " " (relation-alias base)))]
-    (str "(" (to-sql projection)
-         " FROM " (to-sql base) alias
-         (to-sql joins) ")")))
+        alias (when (= (type base) Relation) (str " " (relation-alias base)))
+        select-clause (to-sql projection)
+        from-clause (str " FROM " (to-sql base) alias)
+        join-clause (to-sql joins)
+        where-clause (when-not (empty? selection) (str " WHERE " (to-sql selection)))]
+    (wrap-parens (str select-clause
+                      from-clause
+                      join-clause
+                      where-clause))))
 
 ;;;;;;;;;;;;;;;;;;;;
 
@@ -123,6 +136,9 @@
 (to-sql eff-names)
 (to-sql eff-blah)
 
+(to-sql (select eff-blah [:or [:= (:id eff-blah) "123"]
+                               [:= (:id eff-blah) "456"]]))
+
 (to-sql (Projection. [(:id eff-blah)]))
 (to-sql (Projection. [(:effdt eff-blah)]))
 (to-sql (Projection. [(:id eff-names)]))
@@ -131,9 +147,25 @@
 (to-sql (Join. eff-names))
 (to-sql (Join. eff-blah))
 
-(select eff-blah [:= (:id eff-blah) (:id eff-names)])
+;; (select eff-blah [:= (:id eff-blah) (:id eff-names)])
 
 (to-sql [:= (:id eff-blah) (:id eff-names)])
 (to-sql [:or [:= (:id eff-blah) "12345"]
              [:= (:id eff-blah) "52372"]
              [:= (:id eff-blah) "239746"]])
+
+(defrelation ps-acad-prog  "ps_acad_prog")
+(defrelation max-effdt-of-each-acad-prog
+  (-> ps-acad-prog
+      (project [(:emplid ps-acad-prog)
+                (:acad_career ps-acad-prog)
+                (:stndt_car_nbr ps-acad-prog)
+                (maximum (:effdt ps-acad-prog) "effdt")])
+      (select [:<= (:effdt ps-acad-prog) "SYSDATE"])))
+(to-sql max-effdt-of-each-acad-prog)
+;; (defrelation max-effdt-and-effseq-of-each-acad-prog
+;;   (project ps-acad-prog [(:emplid max-effdt-of-each-acad-prog)
+;;                          (:acad_career max-effdt-of-each-acad-prog)
+;;                          (:stndt_car_nbr max-effdt-of-each-acad-prog)
+;;                          (:effdt max-effdt-of-each-acad-prog)
+;;                          (maximum (:effseq max-effdt-of-each-acad-prog) "effseq")]))
