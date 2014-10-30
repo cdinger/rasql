@@ -1,25 +1,83 @@
-# rasql
+# RASQL
 
-A clojure library for converting relational algebra expressions to SQL.
+A Clojure library for converting relational algebra expressions to SQL. What could be more exciting?!
+
+Note that this library itself is not concerned with talking to databases. Its sole responsiblity is to produce SQL statements.
 
 ## Basic usage
 
-``` clojure
-(def person (new-relation "ps_person"))
+Relations are created and named with the `defrelation` macro. Pass in a name and a keyword that maps to a table
+in your RDMS.
 
-(to-sql (project person [:emplid :dob]))
-;; "(SELECT emplid, dob FROM ps_person)"
+```clojure
+(defrelation person :ps_person)
 
-(to-sql (select person [:= :emplid "1234567"]))
-;; (SELECT * FROM ps_person WHERE (emplid = '1234567'))
+(to-sql person)
+;; "(SELECT * FROM \"ps_person\")"
 ```
+
+### Project
+
+The `project` function takes a relation and a vector of columns you want returned from the relation.
+
+```clojure
+(to-sql (project person [:emplid :date_of_birth]))
+;; (SELECT * FROM "ps_person" WHERE (emplid = '1234567'))
+```
+
+You can scope a projected column by explicitly defining the source relation. This is useful when joining.
+
+```clojure
+(to-sql (project person [(:emplid  person) (:date_of_birth person)]))
+;; "(SELECT \"person\".emplid, \"person\".date_of_birth FROM ps_person \"person\")"
+```
+
+### Select
+
+The `select` function limits the rows returned according to the provided predicate. Predicates for `select`s and `join`s are expressed with vectors:
+
+```clojure
+(to-sql (select person [:= :emplid "1234567"]))
+;; "(SELECT * FROM ps_person \"person\" WHERE (emplid = '1234567'))"
+
+(to-sql (select person [:or [:= :emplid "1234567"]
+                            [:= :emplid "1234568"]
+                            [:= :emplid "1234569"]]))
+;; "(SELECT * FROM ps_person \"person\" WHERE ((emplid = '1234567') OR (emplid = '1234568') OR (emplid = '1234569')))"
+```
+
+### Join
+
+A relation can be joined to another relation with `join`. A predicate is supplied (just like with `select`) to define the join criteria:
+
+```clojure
+(defrelation person :ps_person)
+(defrelation name :ps_names)
+
+(to-sql (join person name [:= (:emplid person) (:emplid name)]))
+;; "(SELECT * FROM ps_person \"person\" JOIN (SELECT * FROM ps_names \"name\") \"name\" ON (\"person\".emplid = \"name\".emplid))"
+```
+
+### Naming relations
+
+It's a good practice to name all relations—especially when you have a lot of them working together. Name a relation by passing it into `defrelation`, just like you would with a table name. From the previous example, it'd be better to name the resulting relation something like `person-with-name`:
+
+```clojure
+(defrelation person :ps_person)
+(defrelation name :ps_names)
+(defrelation person-with-name (join person name [:= (:emplid person) (:emplid name)]))
+
+(to-sql person-with-name)
+;; "(SELECT * FROM (SELECT * FROM ps_person \"person\" JOIN (SELECT * FROM ps_names \"name\") \"name\" ON (\"person\".emplid = \"name\".emplid)) \"person-with-name\")"
+```
+
 ## Everything is a relation
 
 The result of every projection, selection, join (and others) is just a relation. This lets you compose
 smaller relations to get around any wackyness your database schema is imposing on you.
 
 ```clojure
-(def person (new-relation "ps_person"))
+(defrelation person :ps_person)
 
 (type person)
 ;; rasql.core.Relation
@@ -31,44 +89,54 @@ smaller relations to get around any wackyness your database schema is imposing o
 ;; rasql.core.Relation
 ```
 
-##
+## Tackling complex queries with composition
 
-## Compose queries with multiple relations
+Working with a schema like PeopleSoft results in beastly, mind-bending SQL queries. RASQL lets you easily break down nastiness into more comprehensible components, yielding simple to use and simply named relations like `effective-acad-prog`:
 
 ```clojure
-(def acad-prog (new-relation "ps_acad_prog" "ap"))
-(def inner-acad-prog (new-relation "ps_acad_prog"))
+(defrelation acad-prog :ps_acad_prog)
 
-(def max-effdt-of-an-acad-prog
-  (project
-    (select inner-acad-prog
-      [:and [:= (:acad_prog acad-prog) :acad_prog]
-            [:= (:emplid acad-prog) :emplid]
-            [:= (:stdnt_car_nbr acad-prog) :stdnt_car_nbr]
-            [:<= (:effdt acad-prog) (java.util.Date.)]])
-    [(max :effdt)]))
+(defrelation effdt-of-acad-prog
+  (-> acad-prog
+      (project [(:emplid acad-prog)
+                (:acad_career acad-prog)
+                (:stdnt_car_nbr acad-prog)
+                (maximum (:effdt acad-prog) :effdt)])
+      (select [:<= (:effdt acad-prog) Date.])))
 
-(def max-effseq-of-max-effdt-of-ps-acad_prog
-  (project
-    (select inner-acad-prog
-      [:and [:= (:acad_prog acad-prog) :acad_prog]
-            [:= (:emplid acad-prog) :emplid]
-            [:= (:stdnt_car_nbr acad-prog) :stdnt_car_nbr]
-            [:= (:effdt acad-prog) :effdt]])
-    [(max :effseq)]))
+(defrelation eff-keys-acad-prog
+  (-> acad-prog
+      (project [(:emplid acad-prog)
+                (:acad_career acad-prog)
+                (:stdnt_car_nbr acad-prog)
+                (:effdt acad-prog)
+                (maximum (:effseq acad-prog) :effseq)])
+      (join effdt-of-acad-prog [:and [:= (:emplid acad-prog) (:emplid effdt-of-acad-prog)]
+                                     [:= (:acad_career acad-prog) (:acad_career effdt-of-acad-prog)]
+                                     [:= (:stdnt_car_nbr acad-prog) (:stdnt_car_nbr effdt-of-acad-prog)]
+                                     [:= (:effdt acad-prog) (:effdt effdt-of-acad-prog)]])))
 
-(def effective-acad-progs
-  (select acad-prog
-          [:and [:= (:effdt acad-prog) max-effdt-of-an-acad-prog]
-                [:= (:effseq acad-prog) max-effseq-of-max-effdt-of-ps-acad_prog]]))
+(defrelation effective-acad-prog
+  (-> acad-prog
+      (project [(:* acad-prog)])
+      (join eff-keys-acad-prog [:and [:= (:emplid acad-prog) (:emplid eff-keys-acad-prog)]
+                                     [:= (:acad_career acad-prog) (:acad_career eff-keys-acad-prog)]
+                                     [:= (:stdnt_car_nbr acad-prog) (:stdnt_car_nbr eff-keys-acad-prog)]
+                                     [:= (:effdt acad-prog) (:effdt eff-keys-acad-prog)]
+                                     [:= (:effseq acad-prog) (:effseq eff-keys-acad-prog)]])))
 
-(to-sql effective-acad-progs)
-;; (SELECT * FROM ps_acad_prog ap WHERE ((ap.effdt = (SELECT max(effdt) FROM ps_acad_prog WHERE ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt <= '2014-10-14')))) AND (ap.effseq = (SELECT max(effseq) FROM ps_acad_prog WHERE ((ap.acad_prog = acad_prog) AND (ap.emplid = emplid) AND (ap.stdnt_car_nbr = stdnt_car_nbr) AND (ap.effdt = effdt))))))
+(to-sql (select effective-acad-prog [:= (:emplid effective-acad-prog) "1234567"]))
+;; "(SELECT * FROM (SELECT \"acad_prog\".* FROM ps_acad_prog \"acad_prog\" JOIN (SELECT * FROM (SELECT \"acad_prog\".emplid, \"acad_prog\".acad_career, \"acad_prog\".stdnt_car_nbr, \"acad_prog\".effdt, max(\"acad_prog\".effseq) AS effseq FROM ps_acad_prog \"acad_prog\" JOIN (SELECT * FROM (SELECT \"acad_prog\".emplid, \"acad_prog\".acad_career, \"acad_prog\".stdnt_car_nbr, max(\"acad_prog\".effdt) AS effdt FROM ps_acad_prog \"acad_prog\" WHERE (\"acad_prog\".effdt <= 'SYSDATE') GROUP BY \"acad_prog\".emplid, \"acad_prog\".acad_career, \"acad_prog\".stdnt_car_nbr) \"effdt_of_acad_prog\") \"effdt_of_acad_prog\" ON ((\"acad_prog\".emplid = \"effdt_of_acad_prog\".emplid) AND (\"acad_prog\".acad_career = \"effdt_of_acad_prog\".acad_career) AND (\"acad_prog\".stdnt_car_nbr = \"effdt_of_acad_prog\".stdnt_car_nbr) AND (\"acad_prog\".effdt = \"effdt_of_acad_prog\".effdt)) GROUP BY \"acad_prog\".emplid, \"acad_prog\".acad_career, \"acad_prog\".stdnt_car_nbr, \"acad_prog\".effdt) \"eff_keys_acad_prog\") \"eff_keys_acad_prog\" ON ((\"acad_prog\".emplid = \"eff_keys_acad_prog\".emplid) AND (\"acad_prog\".acad_career = \"eff_keys_acad_prog\".acad_career) AND (\"acad_prog\".stdnt_car_nbr = \"eff_keys_acad_prog\".stdnt_car_nbr) AND (\"acad_prog\".effdt = \"eff_keys_acad_prog\".effdt) AND (\"acad_prog\".effseq = \"eff_keys_acad_prog\".effseq))) \"eff_acad_prog\" WHERE (\"eff_acad_prog\".emplid = '1234567'))"
 ```
+
+## SQL generation
+
+> What's with all the subqueries? I don't write queries that way!
+
+Yep—a human is not writing these queries. The point of this library is to liberate you from SQL. The generated SQL is not intended to look as though a human wrote it—it's compiled. If fact, thinking in relations will sometimes [produce more performant queries than humans would typically write]().
 
 ## License
 
 Copyright © 2014 Chris Dinger
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+Distributed under the Eclipse Public License either version 1.0.
