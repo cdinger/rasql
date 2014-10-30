@@ -95,6 +95,9 @@
 (defmethod to-sql java.lang.String [s]
   (str "'" s "'"))
 
+(defmethod to-sql java.lang.Long [n]
+  n)
+
 (defmethod to-sql Column [c]
   (let [column (:column c)
         relation-alias (relation-alias (:relation c))]
