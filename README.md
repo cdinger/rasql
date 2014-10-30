@@ -135,6 +135,10 @@ Working with a schema like PeopleSoft results in beastly, mind-bending SQL queri
 
 Yep—a human is not writing these queries. The point of this library is to liberate you from SQL. The generated SQL is not intended to look as though a human wrote it—it's compiled. If fact, thinking in relations will sometimes [produce more performant queries than humans would typically write]().
 
+## Development
+
+RASQL is a [Leiningen 2](http://leiningen.org/) project. Clone this repo and `lein test` to run the test suite.
+
 ## License
 
 Copyright © 2014 Chris Dinger
