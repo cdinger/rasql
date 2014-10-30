@@ -1,9 +1,3 @@
-;; # Core principles
-;;
-;; 1. every relation must have a name
-;;   - if you don't provide one, a nasty but unique one will be created
-;; 2. RA-focused; this is not a DSL for SQL.
-;;
 (ns rasql.core
   (:require [clojure.string :as str]))
 
@@ -35,8 +29,11 @@
   (valAt [this k]
     (->Column this (name k))))
 
+(defn underscore [s]
+  (str/replace s #"-" "_"))
+
 (defmacro defrelation [relation-name base]
-  `(def ~relation-name (Relation. ~base (if (= (type ~base) String) ~base (unnamed-relation-alias ~base)) (name '~relation-name) nil (->Projection []) nil)))
+  `(def ~relation-name (Relation. ~base (if (string? ~base) ~base (unnamed-relation-alias ~base)) (name '~relation-name) nil (->Projection []) nil)))
 
 ;;;;;; convenience methods
 
@@ -58,13 +55,27 @@
         joins (joins relation)]
     (Relation. base base-alias relation-alias selection projection joins)))
 
+(defn join [relation joined-relation predicate]
+  (let [base (base relation)
+        base-alias (base-alias relation)
+        relation-alias (relation-alias relation)
+        selection (selection relation)
+        projection (projection relation)
+        joins (->Join joined-relation predicate)]
+    (Relation. base base-alias relation-alias selection projection joins)))
+
 (defn maximum [column rename]
   (->Aggregate :max column rename))
 
 ;;;;;; SQL
 
+(declare to-sql)
+
 (defn wrap-parens [s]
   (str "(" s ")"))
+
+(defn wrap-quotes [s]
+  (str "\"" s "\""))
 
 (defn group-by-sql [p]
   (let [cols (:columns p)
@@ -81,19 +92,19 @@
 (defmethod to-sql clojure.lang.Keyword [k]
   (name k))
 
-(defmethod to-sql String [s]
+(defmethod to-sql java.lang.String [s]
   (str "'" s "'"))
 
 (defmethod to-sql Column [c]
   (let [column (:column c)
         relation-alias (relation-alias (:relation c))]
-    (str relation-alias "." column)))
+    (str (wrap-quotes relation-alias) "." column)))
 
 (defmethod to-sql Aggregate [a]
   (let [function (name (:function a))
         column (to-sql (:column a))
         rename (to-sql (:rename a))]
-  (str function (wrap-parens column) " AS \"" rename "\"")))
+  (str function (wrap-parens column) " AS " rename)))
 
 (defmethod to-sql Projection [p]
   (let [raw-columns (:columns p)
@@ -116,10 +127,7 @@
   (let [relation (:relation j)
         relation-alias (relation-alias relation)
         predicate (:predicate j)]
-    (str " JOIN " (to-sql relation) " " relation-alias " ON " (to-sql predicate))))
-
-(defmethod to-sql String [s]
-  s)
+    (str " JOIN " (to-sql relation) " " (wrap-quotes relation-alias) " ON " (to-sql predicate))))
 
 (defmethod to-sql Relation [relation]
   (let [base (base relation)
@@ -127,7 +135,7 @@
         selection (selection relation)
         columns (or (to-sql projection) "*")
         joins (joins relation)
-        alias (relation-alias relation) ;; (when (= (type base) Relation) (str " " (relation-alias base)))
+        alias (wrap-quotes (relation-alias relation)) ;; (when (= (type base) Relation) (str " " (relation-alias base)))
         select-clause (to-sql projection)
         from-clause (str " FROM " (to-sql base) " " alias)
         join-clause (to-sql joins)
@@ -139,59 +147,3 @@
                       where-clause
                       group-by-clause))))
 
-;;;;;;;;;;;;;;;;;;;;
-
-(defrelation acad-prog "ps_acad_prog")
-
-(to-sql (project (project acad-prog [(:emplid acad-prog) (:acad_career acad-prog)]) [(:* acad-prog)]))
-
-
-(defrelation eff-names "ps_names")
-(defrelation eff-blah eff-names)
-(defrelation eff-whoa eff-blah)
-
-
-(to-sql eff-names)
-(to-sql (project eff-blah [(:id eff-blah)]))
-(to-sql eff-blah)
-(to-sql eff-whoa)
-
-(to-sql (select eff-blah [:or [:= (:id eff-blah) "123"]
-                              [:= (:id eff-blah) "456"]]))
-
-(to-sql (Projection. [(:id eff-blah)]))
-(to-sql (Projection. [(:effdt eff-blah)]))
-(to-sql (Projection. [(:id eff-names)]))
-(to-sql (Projection. [(:* eff-names)]))
-
-(to-sql (Join. eff-names [:= (:id eff-names) (:id eff-blah)]))
-(relation-alias eff-blah)
-(base-alias eff-blah)
-
-;; (select eff-blah [:= (:id eff-blah) (:id eff-names)])
-
-(to-sql [:= (:id eff-blah) (:id eff-names)])
-(to-sql [:or [:= (:id eff-blah) "12345"]
-             [:= (:id eff-blah) "52372"]
-             [:= (:id eff-blah) "239746"]])
-
-(defrelation ps-acad-prog  "ps_acad_prog")
-(defrelation max-effdt-of-each-acad-prog
-  (-> ps-acad-prog
-      (project [(:emplid ps-acad-prog)
-                (:acad_career ps-acad-prog)
-                (:stndt_car_nbr ps-acad-prog)
-                (maximum (:effdt ps-acad-prog) "effdt")])
-      (select [:<= (:effdt ps-acad-prog) "SYSDATE"])))
-(to-sql max-effdt-of-each-acad-prog)
-(defrelation max-effdt-and-effseq-of-each-acad-prog
-  (project max-effdt-of-each-acad-prog [(:emplid max-effdt-of-each-acad-prog)
-                                        (:acad_career max-effdt-of-each-acad-prog)
-                                        (:stndt_car_nbr max-effdt-of-each-acad-prog)
-                                        (:effdt max-effdt-of-each-acad-prog)
-                                        (maximum (:effseq max-effdt-of-each-acad-prog) "effseq")]))
-(to-sql max-effdt-and-effseq-of-each-acad-prog)
-
-
-(defrelation emplid-and-max-effdt (project acad-prog [(:emplid acad-prog) (maximum (:effdt acad-prog) "max_effdt")]))
-(to-sql emplid-and-max-effdt)
