@@ -82,7 +82,7 @@
         aggs (filter #(= (type %) Aggregate) cols)
         non-aggs (filter #(= (type %) Column) cols)
         non-aggs-sql (map #(to-sql %) non-aggs)
-        sql (when-not (empty? aggs) (str " GROUP BY " (str/join ", " non-aggs-sql)))]
+        sql (when (and (not-empty aggs) (not-empty non-aggs)) (str " GROUP BY " (str/join ", " non-aggs-sql)))]
     sql))
 
 (defmulti to-sql type)
@@ -149,4 +149,3 @@
                       join-clause
                       where-clause
                       group-by-clause))))
-

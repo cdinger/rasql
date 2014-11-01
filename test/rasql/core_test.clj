@@ -97,3 +97,17 @@
         actual (to-sql r)
         expected "(SELECT * FROM posts_tbl \"post\" WHERE (\"post\".author_id = 123))"]
     (is (= expected actual))))
+
+;; Grouping
+
+(deftest group-by-test
+  (let [r (project post [(maximum :id :max_id) (:blah post)])
+        actual (to-sql r)
+        expected "(SELECT max(id) AS max_id, \"post\".blah FROM posts_tbl \"post\" GROUP BY \"post\".blah)"]
+    (is (= expected actual))))
+
+(deftest exclude-group-by-when-single-aggregate-test
+  (let [r (project post [(maximum :id :max_id)])
+        actual (to-sql r)
+        expected "(SELECT max(id) AS max_id FROM posts_tbl \"post\")"]
+    (is (= expected actual))))
