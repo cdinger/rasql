@@ -89,6 +89,25 @@ smaller relations to get around any wackyness your database schema is imposing o
 ;; rasql.core.Relation
 ```
 
+## Correlated subqueries
+
+You can reference columns that are defined outside the current lexical scope:
+
+```clojure
+(defrelation dept :ps_dept_tbl)
+(defrelation inner-dept :ps_dept_tbl)
+
+(def max-effdt
+  (-> inner-dept
+      (project [(maximum (:effdt inner-dept) :effdt)])
+      (select [:and [:= (:setid inner-dept) (:setid dept)]
+                    [:= (:deptid inner-dept) (:setid dept)]
+                    [:<= (:effdt inner-dept) "01-JAN-14"]])))
+
+(to-sql (select dept [:= (:effdt dept) max-effdt]))
+;; "(SELECT * FROM ps_dept_tbl \"dept\" WHERE (\"dept\".effdt = (SELECT max(\"inner-dept\".effdt) AS effdt FROM ps_dept_tbl \"inner-dept\" WHERE ((\"inner-dept\".setid = \"dept\".setid) AND (\"inner-dept\".deptid = \"dept\".setid) AND (\"inner-dept\".effdt <= '01-JAN-14')))))"
+```
+
 ## Tackling complex queries with composition
 
 Working with a schema like PeopleSoft results in beastly, mind-bending SQL queries. RASQL lets you easily break down nastiness into more comprehensible components, yielding simple to use and simply named relations like `effective-acad-prog`:
