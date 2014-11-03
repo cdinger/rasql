@@ -91,7 +91,7 @@ smaller relations to get around any wackyness your database schema is imposing o
 
 ## Correlated subqueries
 
-You can reference columns that are defined outside the current lexical scope:
+You can reference columns that are defined outside the current lexical scope by creating a var of a relation and using it like a value:
 
 ```clojure
 (defrelation dept :ps_dept_tbl)
