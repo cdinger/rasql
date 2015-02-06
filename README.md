@@ -4,6 +4,9 @@ A Clojure library for converting relational algebra expressions to SQL. What cou
 
 Note that this library itself is not concerned with talking to databases. Its sole responsiblity is to produce SQL statements.
 
+This library is mostly a personal experiment to flesh out some ideas that have
+been bouncing around for a while. Please don't use this for production purposes.
+
 ## Basic usage
 
 Relations are created and named with the `defrelation` macro. Pass in a name and a keyword that maps to a table
