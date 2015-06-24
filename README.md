@@ -1,4 +1,4 @@
-# RASQL
+# RASQL [![Build Status](https://travis-ci.org/cdinger/rasql.svg?branch=master)](https://travis-ci.org/cdinger/rasql)
 
 A Clojure library for converting relational algebra expressions to SQL. What could be more exciting?!
 
