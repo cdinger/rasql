@@ -77,7 +77,7 @@ It's a good practice to name all relations—especially when you have a lot of t
 ## Everything is a relation
 
 The result of every projection, selection, join (and others) is just a relation. This lets you compose
-smaller relations to get around any wackyness your database schema is imposing on you.
+smaller relations to get around any wackiness your database schema is imposing on you.
 
 ```clojure
 (defrelation person :ps_person)
