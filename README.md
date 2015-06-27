@@ -155,7 +155,10 @@ Working with a schema like PeopleSoft results in beastly, mind-bending SQL queri
 
 > What's with all the subqueries? I don't write queries that way!
 
-Yep—a human is not writing these queries. The point of this library is to liberate you from SQL. The generated SQL is not intended to look as though a human wrote it—it's compiled. If fact, thinking in relations will sometimes [produce more performant queries than humans would typically write]().
+Yep—a human is not writing these queries. The point of this library is to
+liberate you from SQL. The generated SQL is not intended to look as though a
+human wrote it—it's compiled. If fact, thinking in relations will sometimes
+[produce more performant queries than humans would typically write](http://houseofding.com/2014/10/faster-peoplesoft-effective-date-queries/).
 
 ## Development
 
