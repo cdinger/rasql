@@ -21,7 +21,7 @@
   IRelation
   clojure.lang.ILookup
   (base [_] base)
-  (base-alias [this] base-alias) ;; (or base-alias (when (= (type base) String) base (unnamed-relation-alias base))))
+  (base-alias [this] base-alias)
   (relation-alias [_] relation-alias)
   (selection [_] selection)
   (projection [_] projection)
@@ -138,7 +138,7 @@
         selection (selection relation)
         columns (or (to-sql projection) "*")
         joins (joins relation)
-        alias (wrap-quotes (relation-alias relation)) ;; (when (= (type base) Relation) (str " " (relation-alias base)))
+        alias (wrap-quotes (relation-alias relation))
         select-clause (to-sql projection)
         from-clause (str " FROM " (to-sql base) " " alias)
         join-clause (to-sql joins)
