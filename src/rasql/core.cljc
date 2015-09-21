@@ -1,8 +1,10 @@
 (ns rasql.core
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str])
+  #?(:cljs (:require-macros [rasql.core :refer [defrelation]])))
 
 (defn unnamed-relation-alias [relation]
-  (str "unnamed-relation-" (System/identityHashCode relation)))
+  (str "unnamed-relation-" #?(:clj (System/identityHashCode relation)
+                              :cljs (* js/Math.random 10000000000))))
 
 (defprotocol IRelation
   (base [this])
@@ -19,21 +21,24 @@
 
 (deftype Relation [base base-alias relation-alias selection projection joins]
   IRelation
-  clojure.lang.ILookup
   (base [_] base)
   (base-alias [this] base-alias)
   (relation-alias [_] relation-alias)
   (selection [_] selection)
   (projection [_] projection)
   (joins [_] joins)
-  (valAt [this k]
-    (->Column this (name k))))
+  #?(:clj clojure.lang.ILookup
+     :cljs ILookup)
+  #?(:clj (valAt [this k]
+            (->Column this (name k)))
+     :cljs (-lookup [this k]
+             (->Column this (name k)))))
 
 (defn underscore [s]
   (str/replace s #"-" "_"))
 
-(defmacro defrelation [relation-name base]
-  `(def ~relation-name (Relation. ~base (if (string? ~base) ~base (unnamed-relation-alias ~base)) (name '~relation-name) nil (->Projection []) nil)))
+#?(:clj (defmacro defrelation [relation-name base]
+          `(def ~relation-name (Relation. ~base (if (string? ~base) ~base (unnamed-relation-alias ~base)) (name '~relation-name) nil (->Projection []) nil))))
 
 ;;;;;; convenience methods
 
@@ -89,13 +94,16 @@
 
 (defmethod to-sql nil [_])
 
-(defmethod to-sql clojure.lang.Keyword [k]
+(defmethod to-sql #?(:clj clojure.lang.Keyword
+                     :cljs cljs.core/Keyword) [k]
   (name k))
 
-(defmethod to-sql java.lang.String [s]
+(defmethod to-sql #?(:clj java.lang.String
+                     :cljs js/String) [s]
   (str "'" s "'"))
 
-(defmethod to-sql java.lang.Long [n]
+(defmethod to-sql #?(:clj java.lang.Long
+                     :cljs js/Number) [n]
   n)
 
 (defmethod to-sql Column [c]
@@ -116,7 +124,8 @@
         sql (str "SELECT " sql-columns)]
     sql))
 
-(defmethod to-sql clojure.lang.PersistentVector [p]
+(defmethod to-sql #?(:clj clojure.lang.PersistentVector
+                     :cljs cljs.core/PersistentVector) [p]
   (let [operator (first p)
         operands (rest p)
         predicate-sql (if (contains? #{:and :or} operator)
