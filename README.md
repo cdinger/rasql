@@ -1,11 +1,37 @@
 # RASQL [![Build Status](https://travis-ci.org/cdinger/rasql.svg?branch=master)](https://travis-ci.org/cdinger/rasql)
 
-A Clojure library for converting relational algebra expressions to SQL. What could be more exciting?!
+A Clojure/ClojureScript library for converting relational algebra expressions to SQL. What could be more exciting?!
 
-Note that this library itself is not concerned with talking to databases. Its sole responsiblity is to produce SQL statements.
+Note that this library itself is not concerned with talking to databases. Its sole responsibility is to produce SQL statements.
 
 This library is mostly a personal experiment to flesh out some ideas that have
 been bouncing around for a while. Please don't use this for production purposes.
+
+## Installation
+
+For Leiningen projects, add the latest `com.houseofding/rasql` dependency.
+
+```clojure
+(defproject foo "0.1.0"
+  ...
+  :dependencies [[org.clojure/clojure "1.7.0"]
+                 [org.clojure/clojurescript "0.0-2760"]
+                 [com.houseofding/rasql "0.1.0"]]
+  ...)
+```
+
+With the `com.houseofding/rasql` dependency installed, you can then `require` the library and use it:
+
+```clojure
+(ns blah
+  (:require [rasql.core :as rasql]))
+
+(rasql/defrelation creatures)
+(rasql/defrelation skills)
+(rasql/defrelation abilities)
+
+(rasql/to-sql (join creatures abilities [:= (:id creature) (:creature_id abilities)])
+```
 
 ## Basic usage
 
