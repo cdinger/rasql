@@ -1,10 +1,9 @@
 (ns rasql.core-test
   (:require [clojure.test :refer :all]
-            [rasql.core :refer :all])
-  (:refer-clojure :exclude [comment]))
+            [rasql.core :refer :all]))
 
-(defrelation post :posts_tbl)
-(defrelation comment :comments_tbl)
+(defrelation posts :posts_tbl)
+(defrelation comments :comments_tbl)
 
 ;; Projection
 
@@ -21,93 +20,93 @@
     (is (= expected actual))))
 
 (deftest relation-projection-test
-  (let [p (->Projection [(:a post)])
+  (let [p (->Projection [(:a posts)])
        actual (to-sql p)
-       expected "SELECT \"post\".a"]
+       expected "SELECT \"posts\".a"]
     (is (= expected actual))))
 
 ;; Predicates
 
 (deftest predicate-test
-  (let [p [:= (:id post) (:post_id comment)]
+  (let [p [:= (:id posts) (:posts_id comments)]
         actual (to-sql p)
-        expected "(\"post\".id = \"comment\".post_id)"]
+        expected "(\"posts\".id = \"comments\".posts_id)"]
     (is (= expected actual))))
 
 
 (deftest relation-predicate-test
-  (let [p [:= (:a post) (:b post)]
+  (let [p [:= (:a posts) (:b posts)]
         actual (to-sql p)
-        expected "(\"post\".a = \"post\".b)"]
+        expected "(\"posts\".a = \"posts\".b)"]
     (is (= expected actual))))
 
 ;; Joins
 
 (deftest join-test
-  (let [j (->Join comment [:= (:id post) (:post_id comment)])
+  (let [j (->Join comments [:= (:id posts) (:posts_id comments)])
         actual (to-sql j)
-        expected " JOIN (SELECT * FROM comments_tbl \"comment\") \"comment\" ON (\"post\".id = \"comment\".post_id)"]
+        expected " JOIN (SELECT * FROM comments_tbl \"comments\") \"comments\" ON (\"posts\".id = \"comments\".posts_id)"]
     (is (= expected actual))))
 
 ;; Relation
 
 (deftest relation-test
-  (let [actual (to-sql post)
-        expected "(SELECT * FROM posts_tbl \"post\")"]
+  (let [actual (to-sql posts)
+        expected "(SELECT * FROM posts_tbl \"posts\")"]
     (is (= expected actual))))
 
 (deftest empty-project-test
-  (let [r (project post [])
+  (let [r (project posts [])
         actual (to-sql r)
-        expected "(SELECT * FROM posts_tbl \"post\")"]
+        expected "(SELECT * FROM posts_tbl \"posts\")"]
     (is (= expected actual))))
 
 (deftest all-project-test
-  (let [r (project post [:*])
+  (let [r (project posts [:*])
         actual (to-sql r)
-        expected "(SELECT * FROM posts_tbl \"post\")"]
+        expected "(SELECT * FROM posts_tbl \"posts\")"]
     (is (= expected actual))))
 
 (deftest relation-all-project-test
-  (let [r (project post [(:* post)])
+  (let [r (project posts [(:* posts)])
         actual (to-sql r)
-        expected "(SELECT \"post\".* FROM posts_tbl \"post\")"]
+        expected "(SELECT \"posts\".* FROM posts_tbl \"posts\")"]
     (is (= expected actual))))
 
 (deftest multiple-project-test
-  (let [r (project post [:a :b :c])
+  (let [r (project posts [:a :b :c])
         actual (to-sql r)
-        expected "(SELECT a, b, c FROM posts_tbl \"post\")"]
+        expected "(SELECT a, b, c FROM posts_tbl \"posts\")"]
     (is (= expected actual))))
 
 (deftest multiple-relation-column-project-test
-  (let [r (project post [(:a post) (:b post) :c])
+  (let [r (project posts [(:a posts) (:b posts) :c])
         actual (to-sql r)
-        expected "(SELECT \"post\".a, \"post\".b, c FROM posts_tbl \"post\")"]
+        expected "(SELECT \"posts\".a, \"posts\".b, c FROM posts_tbl \"posts\")"]
     (is (= expected actual))))
 
 (deftest relation-select-test
-  (let [r (select post [:= :title "An awesome post"])
+  (let [r (select posts [:= :title "An awesome posts"])
         actual (to-sql r)
-        expected "(SELECT * FROM posts_tbl \"post\" WHERE (title = 'An awesome post'))"]
+        expected "(SELECT * FROM posts_tbl \"posts\" WHERE (title = 'An awesome posts'))"]
     (is (= expected actual))))
 
 (deftest relation-qualified-select-test
-  (let [r (select post [:= (:author_id post) 123])
+  (let [r (select posts [:= (:author_id posts) 123])
         actual (to-sql r)
-        expected "(SELECT * FROM posts_tbl \"post\" WHERE (\"post\".author_id = 123))"]
+        expected "(SELECT * FROM posts_tbl \"posts\" WHERE (\"posts\".author_id = 123))"]
     (is (= expected actual))))
 
 ;; Grouping
 
 (deftest group-by-test
-  (let [r (project post [(maximum :id :max_id) (:blah post)])
+  (let [r (project posts [(maximum :id :max_id) (:blah posts)])
         actual (to-sql r)
-        expected "(SELECT max(id) AS max_id, \"post\".blah FROM posts_tbl \"post\" GROUP BY \"post\".blah)"]
+        expected "(SELECT max(id) AS max_id, \"posts\".blah FROM posts_tbl \"posts\" GROUP BY \"posts\".blah)"]
     (is (= expected actual))))
 
 (deftest exclude-group-by-when-single-aggregate-test
-  (let [r (project post [(maximum :id :max_id)])
+  (let [r (project posts [(maximum :id :max_id)])
         actual (to-sql r)
-        expected "(SELECT max(id) AS max_id FROM posts_tbl \"post\")"]
+        expected "(SELECT max(id) AS max_id FROM posts_tbl \"posts\")"]
     (is (= expected actual))))
