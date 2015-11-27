@@ -25,7 +25,7 @@ The `project` function takes a relation and a vector of columns you want returne
 
 ```clojure
 (to-sql (project person [:emplid :date_of_birth]))
-;; (SELECT * FROM "ps_person" WHERE (emplid = '1234567'))
+;; "(SELECT emplid, date_of_birth FROM ps_person \"person\")"
 ```
 
 You can scope a projected column by explicitly defining the source relation. This is useful when joining.
