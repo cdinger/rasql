@@ -1,4 +1,4 @@
-(defproject rasql "0.1.0-SNAPSHOT"
+(defproject com.houseofding/rasql "0.1.0-SNAPSHOT"
   :description "A library for converting relational algebra expressions to SQL"
   :url "https://github.umn.edu/ding0057/rasql"
   :license {:name "Eclipse Public License"
