@@ -9,7 +9,7 @@ been bouncing around for a while. Please don't use this for production purposes.
 
 ## Installation
 
-For Leiningen projects, add the latest `com.houseofding/rasql` dependency `[com.houseofding/rasql "0.1.0"]` and then require the `rasql.core` in your namespace.
+For Leiningen projects, add the latest `com.houseofding/rasql` dependency `[com.houseofding/rasql "0.2.0"]` and then require the `rasql.core` in your namespace.
 
 ## Basic usage
 
