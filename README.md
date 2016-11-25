@@ -67,7 +67,9 @@ A relation can be joined to another relation with `join`. A predicate is supplie
 
 ### Naming relations
 
-It's a good practice to name all relations—especially when you have a lot of them working together. Name a relation by passing it into `defrelation`, just like you would with a table name. From the previous example, it'd be better to name the resulting relation something like `person-with-name`:
+As [a smart guy](https://www.cs.umn.edu/people/john-v-carlis) says in his [awesome book](http://amzn.to/2fXotpl), **it's a good practice to name all relations**—especially when you have a lot of them working together.
+Name a relation by passing it into `defrelation`, just like you would with a table name.
+From the previous example, it'd be better to name the resulting relation something like `person-with-name`:
 
 ```clojure
 (defrelation person :ps_person)
