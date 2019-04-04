@@ -168,6 +168,8 @@ human wrote it—it's compiled. If fact, thinking in relations will sometimes
 
 RASQL is a [Leiningen 2](http://leiningen.org/) project. Clone this repo and `lein test` to run the test suite.
 
+RASQL also support `deps.edn`, you can run `clj -A:test`  to run the test suite.
+
 ## License
 
 Copyright © 2014 Chris Dinger
